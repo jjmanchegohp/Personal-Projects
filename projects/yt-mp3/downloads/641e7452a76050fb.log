@@ -1,0 +1,22 @@
+[youtube] Extracting URL: https://youtu.be/dFVxGRekRSg
+[youtube] dFVxGRekRSg: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] dFVxGRekRSg: Downloading android vr player API JSON
+[info] dFVxGRekRSg: Downloading 1 format(s): 251
+[download] Destination: C:\xampp\htdocs\yt-mp3\downloads\641e7452a76050fb_(ext)s
+[download]   0.0% of    4.80MiB at  334.13KiB/s ETA 00:14
+[download]   0.1% of    4.80MiB at  752.07KiB/s ETA 00:06
+[download]   0.1% of    4.80MiB at    1.71MiB/s ETA 00:02
+[download]   0.3% of    4.80MiB at    2.94MiB/s ETA 00:01
+[download]   0.6% of    4.80MiB at    2.33MiB/s ETA 00:02
+[download]   1.3% of    4.80MiB at    3.25MiB/s ETA 00:01
+[download]   2.6% of    4.80MiB at    3.66MiB/s ETA 00:01
+[download]   5.2% of    4.80MiB at    5.20MiB/s ETA 00:00
+[download]  10.4% of    4.80MiB at    7.58MiB/s ETA 00:00
+[download]  20.8% of    4.80MiB at   11.13MiB/s ETA 00:00
+[download]  41.6% of    4.80MiB at   12.77MiB/s ETA 00:00
+[download]  83.3% of    4.80MiB at   13.75MiB/s ETA 00:00
+[download] 100.0% of    4.80MiB at   12.39MiB/s ETA 00:00
+[download] 100% of    4.80MiB in 00:00:00 at 10.90MiB/s
+[ExtractAudio] Destination: C:\xampp\htdocs\yt-mp3\downloads\641e7452a76050fb_(ext)s.mp3
+Deleting original file C:\xampp\htdocs\yt-mp3\downloads\641e7452a76050fb_(ext)s (pass -k to keep)
