@@ -1,0 +1,9 @@
+WARNING: Your yt-dlp version (2026.03.17) is older than 90 days!
+         It is strongly recommended to always use the latest version.
+         Run "yt-dlp --update" or "yt-dlp -U" to update.
+         To suppress this warning, add --no-update to your command/config.
+
+Usage: yt-dlp.exe [OPTIONS] URL [URL...]
+
+yt-dlp.exe: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.

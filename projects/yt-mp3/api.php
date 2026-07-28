@@ -10,11 +10,59 @@ $ytdlpPath    = $binDir . 'yt-dlp.exe';
 if (!is_dir($downloadsDir)) mkdir($downloadsDir, 0777, true);
 if (!is_dir($binDir))       mkdir($binDir,       0777, true);
 
+function sanitizeFilename($s) {
+    $s = preg_replace('/[\\\\\/:*?"<>|]/', '', $s);
+    $s = trim($s);
+    return $s === '' ? 'sin_nombre' : mb_substr($s, 0, 80);
+}
+
 // ── CHECK BIN ──────────────────────────────────────────────────
 if ($action === 'check') {
     echo json_encode([
         'ytdlp'  => file_exists($ytdlpPath),
         'ffmpeg' => file_exists($binDir . 'ffmpeg.exe'),
+    ]);
+    exit;
+}
+
+// ── PREVIEW / INFO ──────────────────────────────────────────────
+if ($action === 'info') {
+    $url = trim($_GET['url'] ?? $_POST['url'] ?? '');
+    if (!$url) { echo json_encode(['error' => 'URL requerida']); exit; }
+    if (!file_exists($ytdlpPath)) { echo json_encode(['error' => 'yt-dlp.exe no encontrado en bin/']); exit; }
+
+    $descriptors = [['pipe','r'], ['pipe','w'], ['pipe','w']];
+    $proc = proc_open([$ytdlpPath, '--dump-single-json', '--no-playlist', '--no-warnings', $url], $descriptors, $pipes);
+    if (!is_resource($proc)) { echo json_encode(['error' => 'No se pudo iniciar yt-dlp']); exit; }
+
+    fclose($pipes[0]);
+    $out = stream_get_contents($pipes[1]);
+    $err = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($proc);
+
+    $data = json_decode($out, true);
+    if (!$data) { echo json_encode(['error' => 'No se pudo leer información del vídeo. ' . trim($err)]); exit; }
+
+    $rawTitle = $data['title'] ?? '';
+    $uploader = $data['uploader'] ?? $data['channel'] ?? '';
+
+    // Intenta separar "Artista - Título" si el título ya viene así
+    $artist = $uploader;
+    $title  = $rawTitle;
+    if (preg_match('/^\s*(.+?)\s*[-–—]\s*(.+?)\s*$/u', $rawTitle, $m)) {
+        $artist = $m[1];
+        $title  = $m[2];
+    }
+
+    echo json_encode([
+        'ok'        => true,
+        'raw_title' => $rawTitle,
+        'uploader'  => $uploader,
+        'artist'    => $artist,
+        'title'     => $title,
+        'thumbnail' => $data['thumbnail'] ?? '',
     ]);
     exit;
 }
@@ -51,15 +99,25 @@ if ($action === 'install') {
 if ($action === 'start') {
     $url = trim($_POST['url'] ?? '');
     if (!$url) { echo json_encode(['error' => 'URL requerida']); exit; }
-    if (!file_exists($ytdlpPath)) { echo json_encode(['error' => 'yt-dlp.exe no encontrado en bin/']); exit; }
+    if (!file_exists($ytdlpPath))            { echo json_encode(['error' => 'yt-dlp.exe no encontrado en bin/']); exit; }
+    if (!file_exists($binDir.'ffmpeg.exe'))  { echo json_encode(['error' => 'ffmpeg.exe no encontrado en bin/']); exit; }
 
-    $jobId   = bin2hex(random_bytes(8));
-    $logFile = $downloadsDir . $jobId . '.log';
-    $outTpl  = $downloadsDir . $jobId . '_%(title)s.%(ext)s';
+    $artist = trim($_POST['artist'] ?? '');
+    $title  = trim($_POST['title']  ?? '');
+    if ($artist === '') $artist = 'Desconocido';
+    if ($title  === '') $title  = 'Video';
 
-    // Use long-form flags to avoid Windows misinterpreting short flags like -x
-    // Pass each argument as a separate array element — no shell escaping needed
-    $args = [
+    $jobId    = bin2hex(random_bytes(8));
+    $logFile  = $downloadsDir . $jobId . '.log';
+    $tempFile = $downloadsDir . 'tmp_' . $jobId . '.mp3';
+    $tempTpl  = $downloadsDir . 'tmp_' . $jobId . '.%(ext)s';
+
+    $safeArtist = sanitizeFilename($artist);
+    $safeTitle  = sanitizeFilename($title);
+    $finalFile  = $downloadsDir . $jobId . '_' . $safeArtist . ' - ' . $safeTitle . '.mp3';
+
+    // Paso 1: yt-dlp descarga y extrae el audio a un nombre temporal fijo
+    $ytArgs = [
         $ytdlpPath,
         '--extract-audio',
         '--audio-format',    'mp3',
@@ -67,19 +125,36 @@ if ($action === 'start') {
         '--ffmpeg-location', rtrim($binDir, DIRECTORY_SEPARATOR),
         '--newline',
         '--no-playlist',
-        '-o',                $outTpl,
+        '-o',                $tempTpl,
         $url,
     ];
 
-    // Build a safe quoted command string for cmd.exe
-    $quoted = array_map(fn($a) => '"' . str_replace('"', '""', $a) . '"', $args);
-    $cmd    = implode(' ', $quoted) . ' > "' . $logFile . '" 2>&1';
+    // Paso 2: ffmpeg copia el audio (sin recodificar) y escribe los tags exactos
+    $ffArgs = [
+        $binDir . 'ffmpeg.exe',
+        '-y',
+        '-i',        $tempFile,
+        '-c',        'copy',
+        '-metadata', 'title='  . $title,
+        '-metadata', 'artist=' . $artist,
+        '-metadata', 'album='  . $artist,
+        $finalFile,
+    ];
 
-    // Write .bat with explicit cmd header and UTF-8 safe encoding
+    $quote = fn($a) => '"' . str_replace('"', '""', $a) . '"';
+    $ytCmd = implode(' ', array_map($quote, $ytArgs));
+    $ffCmd = implode(' ', array_map($quote, $ffArgs));
+
+    // Encadenado: descarga → etiqueta y renombra → borra temporal
+    $full = $ytCmd . ' >> "' . $logFile . '" 2>&1'
+        . ' && ' . $ffCmd . ' >> "' . $logFile . '" 2>&1'
+        . ' && del "' . $tempFile . '"';
+
+    $fullEscaped = str_replace('%', '%%', $full);
+
     $batFile = $downloadsDir . $jobId . '.bat';
-    file_put_contents($batFile, "@echo off\r\nchcp 65001 > nul\r\n" . $cmd . "\r\n");
+    file_put_contents($batFile, "@echo off\r\nchcp 65001 > nul\r\n" . $fullEscaped . "\r\n");
 
-    // Launch via cmd.exe /C — do NOT use start /B as it drops stdout redirect
     $descriptors = [['pipe','r'], ['pipe','w'], ['pipe','w']];
     $proc = proc_open('cmd.exe /C "' . $batFile . '"', $descriptors, $pipes);
     if (is_resource($proc)) {
@@ -114,23 +189,23 @@ if ($action === 'progress') {
         $line = trim($raw);
         if (!$line) continue;
 
-        // Destination → title
-        if (preg_match('/Destination:.+[\\/\\\\][a-f0-9]+_(.+?)\.(webm|mp4|m4a|opus|ogg|mp3)$/i', $line, $m))
-            $title = $m[1];
-
-        // ExtractAudio → title
-        if (preg_match('/\[ExtractAudio\].+[\\/\\\\][a-f0-9]+_(.+?)\.mp3/i', $line, $m))
-            $title = $m[1];
+        // Destination → título (nombre temporal, solo usamos esto para mostrar progreso, no como fuente del título final)
+        if (preg_match('/Destination:.+[\\/\\\\]tmp_[a-f0-9]+\.(webm|mp4|m4a|opus|ogg|mp3)$/i', $line, $m))
+            $title = $title ?: 'Procesando…';
 
         // Percentage
         if (preg_match('/\[download\]\s+(\d+(?:\.\d+)?)%/', $line, $m) && (float)$m[1] > $progress)
             $progress = (int)(float)$m[1];
 
-        if (stripos($line, '[ExtractAudio]') !== false && $progress < 95)
-            $progress = 95;
+        if (stripos($line, '[ExtractAudio]') !== false && $progress < 90)
+            $progress = 90;
 
+        // yt-dlp ya terminó de extraer el audio, pero ffmpeg aún tiene que
+        // etiquetar y renombrar al archivo final. NO marcamos $done aquí:
+        // solo avanzamos el progreso visual. $done depende exclusivamente
+        // de que el archivo final con metadatos ya exista (ver $mp3File abajo).
         if (stripos($line, 'Deleting original file') !== false || stripos($line, 'has already been downloaded') !== false)
-            $done = true;
+            $progress = max($progress, 97);
 
         if (preg_match('/^ERROR\s*:/i', $line))
             $error = $line;

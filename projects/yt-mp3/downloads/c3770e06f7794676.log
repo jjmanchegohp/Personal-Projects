@@ -1,0 +1,25 @@
+WARNING: Your yt-dlp version (2026.03.17) is older than 90 days!
+         It is strongly recommended to always use the latest version.
+         Run "yt-dlp --update" or "yt-dlp -U" to update.
+         To suppress this warning, add --no-update to your command/config.
+[youtube] Extracting URL: https://youtu.be/KjymkWV09nc?si=VD6q9MxvMyuPYk4E
+[youtube] KjymkWV09nc: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] KjymkWV09nc: Downloading android vr player API JSON
+[info] KjymkWV09nc: Downloading 1 format(s): 251
+[download] Destination: C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\c3770e06f7794676_(ext)s
+[download]   0.0% of    2.76MiB at  Unknown B/s ETA Unknown
+[download]   0.1% of    2.76MiB at  Unknown B/s ETA Unknown
+[download]   0.2% of    2.76MiB at    1.83MiB/s ETA 00:01
+[download]   0.5% of    2.76MiB at    2.77MiB/s ETA 00:00
+[download]   1.1% of    2.76MiB at    2.56MiB/s ETA 00:01
+[download]   2.2% of    2.76MiB at    3.02MiB/s ETA 00:00
+[download]   4.5% of    2.76MiB at    4.17MiB/s ETA 00:00
+[download]   9.0% of    2.76MiB at    5.38MiB/s ETA 00:00
+[download]  18.1% of    2.76MiB at    7.69MiB/s ETA 00:00
+[download]  36.2% of    2.76MiB at   12.27MiB/s ETA 00:00
+[download]  72.4% of    2.76MiB at   19.91MiB/s ETA 00:00
+[download] 100.0% of    2.76MiB at   24.23MiB/s ETA 00:00
+[download] 100% of    2.76MiB in 00:00:00 at 17.03MiB/s
+[ExtractAudio] Destination: C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\c3770e06f7794676_(ext)s.mp3
+Deleting original file C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\c3770e06f7794676_(ext)s (pass -k to keep)

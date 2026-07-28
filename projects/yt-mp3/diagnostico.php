@@ -16,7 +16,7 @@ $ffVer  = file_exists($ffmpeg) ? runCmd('"'.$ffmpeg.'" -version') : null;
 $ffpVer = file_exists($ffprobe)? runCmd('"'.$ffprobe.'" -version'): null;
 
 // Test: can yt-dlp see ffmpeg?
-$ffTest = file_exists($ytdlp) ? runCmd('"'.$ytdlp.'" --ffmpeg-location "'.rtrim($binDir,'/').'\" --version') : null;
+$ffTest = file_exists($ytdlp) ? runCmd('"'.$ytdlp.'" --ffmpeg-location "'.rtrim($binDir,'/').'" --version') : null;
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -104,14 +104,21 @@ foreach ($files as $name => $path): ?>
 <h2>PHP exec() habilitado</h2>
 <div class="row">
   <span class="label">exec disponible</span>
-  <?php $disabled = in_array('exec', array_map('trim', explode(',', ini_get('disable_functions')))): ?>
+  <?php $disabled = in_array('exec', array_map('trim', explode(',', ini_get('disable_functions')))); ?>
   <span class="val <?= $disabled ? 'err' : 'ok' ?>"><?= $disabled ? 'DESHABILITADO — edita php.ini y quita exec de disable_functions' : 'OK' ?></span>
 </div>
 
 <div class="row">
   <span class="label">proc_open disponible</span>
-  <?php $po = in_array('proc_open', array_map('trim', explode(',', ini_get('disable_functions')))): ?>
+  <?php $po = in_array('proc_open', array_map('trim', explode(',', ini_get('disable_functions')))); ?>
   <span class="val <?= $po ? 'err' : 'ok' ?>"><?= $po ? 'DESHABILITADO — edita php.ini y quita proc_open de disable_functions' : 'OK' ?></span>
+</div>
+
+<div class="row">
+  <span class="label">popen / pclose disponible</span>
+  <?php $disabledList = array_map('trim', explode(',', ini_get('disable_functions'))); ?>
+  <?php $pop = in_array('popen', $disabledList) || in_array('pclose', $disabledList); ?>
+  <span class="val <?= $pop ? 'err' : 'ok' ?>"><?= $pop ? 'DESHABILITADO — api.php usa popen()/pclose() para lanzar yt-dlp en segundo plano, edita php.ini y quítalas de disable_functions' : 'OK' ?></span>
 </div>
 
 <h2>Últimos archivos descargados</h2>

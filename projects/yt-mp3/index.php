@@ -37,6 +37,17 @@
     <button id="go-btn" onclick="startDownload()">Descargar</button>
   </div>
 
+  <div id="preview-card" style="display:none">
+    <img id="preview-thumb" src="" alt="">
+    <div class="preview-fields">
+      <label>Artista / Banda
+        <input type="text" id="artist-input">
+      </label>
+      <label>Título de la canción
+        <input type="text" id="title-input">
+      </label>
+    </div>
+  </div>
   <div id="prog-area">
     <div class="prog-row">
       <span id="phase">Iniciando</span>
@@ -77,7 +88,7 @@
 </footer>
 
 <script>
-let jobId = null, timer = null;
+let jobId = null, timer = null, previewReady = false;
 const $ = id => document.getElementById(id);
 
 (async () => {
@@ -101,7 +112,43 @@ async function installYtdlp() {
   }
 }
 
-$('url').addEventListener('keydown', e => { if (e.key === 'Enter') startDownload(); });
+$('url').addEventListener('blur', loadPreview);
+$('url').addEventListener('keydown', e => { if (e.key === 'Enter') loadPreview(); });
+
+// Si el usuario cambia la URL después de haber cargado un preview,
+// invalidamos ese preview para no descargar un vídeo etiquetado con
+// datos de la canción anterior.
+$('url').addEventListener('input', () => {
+  previewReady = false;
+  $('preview-card').style.display = 'none';
+});
+
+async function loadPreview() {
+  const url = $('url').value.trim();
+  if (!url) return;
+  $('go-btn').disabled = true;
+  $('go-btn').textContent = 'Buscando…';
+  try {
+    const r = await fetch('api.php?action=info&url=' + encodeURIComponent(url)).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+
+    $('artist-input').value = r.artist || r.uploader || '';
+    $('title-input').value  = r.title  || r.raw_title || '';
+    if (r.thumbnail) {
+      $('preview-thumb').src = r.thumbnail;
+      $('preview-thumb').style.display = 'block';
+    } else {
+      $('preview-thumb').style.display = 'none';
+    }
+    $('preview-card').style.display = 'block';
+    previewReady = true;
+  } catch(e) {
+    showErr(e.message);
+  } finally {
+    $('go-btn').disabled = false;
+    $('go-btn').textContent = 'Descargar';
+  }
+}
 
 function reset() {
   clearInterval(timer);
@@ -115,13 +162,20 @@ function reset() {
 async function startDownload() {
   const url = $('url').value.trim();
   if (!url) return;
+
+  // Si aún no se cargó el preview (usuario le dio directo a "Descargar"), cárgalo primero
+  if (!previewReady) { await loadPreview(); return; }
+
   reset();
   $('go-btn').disabled = true;
   $('prog-area').style.display = 'block';
   $('phase').textContent = 'Conectando';
+  $('song').innerHTML = '<strong>' + $('artist-input').value + ' - ' + $('title-input').value + '</strong>';
 
   const fd = new FormData();
   fd.append('url', url);
+  fd.append('artist', $('artist-input').value.trim());
+  fd.append('title', $('title-input').value.trim());
 
   try {
     const r = await fetch('api.php?action=start', { method: 'POST', body: fd }).then(r => r.json());
@@ -140,7 +194,6 @@ async function poll() {
     const d = await fetch(`api.php?action=progress&job=${jobId}`).then(r => r.json());
     $('bar').style.width = (d.progress || 0) + '%';
     $('pct').textContent = (d.progress || 0) + '%';
-    if (d.title) $('song').innerHTML = '<strong>' + d.title + '</strong>';
     if (d.status === 'running') $('phase').textContent = d.progress >= 95 ? 'Convirtiendo a MP3' : 'Descargando audio';
     if (d.status === 'done') {
       clearInterval(timer);

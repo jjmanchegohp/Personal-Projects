@@ -1,0 +1,56 @@
+WARNING: Your yt-dlp version (2026.03.17) is older than 90 days!
+         It is strongly recommended to always use the latest version.
+         Run "yt-dlp --update" or "yt-dlp -U" to update.
+         To suppress this warning, add --no-update to your command/config.
+[youtube] Extracting URL: https://youtu.be/mbllkZc1_aQ?si=CWedZ9NRBNLYE10X
+[youtube] mbllkZc1_aQ: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] mbllkZc1_aQ: Downloading android vr player API JSON
+[info] mbllkZc1_aQ: Downloading 1 format(s): 251
+[download] Destination: C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\tmp_4dfaf35c76cff8cd.webm
+[download]   0.0% of    3.01MiB at  Unknown B/s ETA Unknown
+[download]   0.1% of    3.01MiB at  214.11KiB/s ETA 00:14
+[download]   0.2% of    3.01MiB at  499.59KiB/s ETA 00:06
+[download]   0.5% of    3.01MiB at    1.05MiB/s ETA 00:02
+[download]   1.0% of    3.01MiB at    2.16MiB/s ETA 00:01
+[download]   2.0% of    3.01MiB at    2.19MiB/s ETA 00:01
+[download]   4.1% of    3.01MiB at    2.95MiB/s ETA 00:00
+[download]   8.3% of    3.01MiB at    2.96MiB/s ETA 00:00
+[download]  16.6% of    3.01MiB at    4.35MiB/s ETA 00:00
+[download]  33.2% of    3.01MiB at    7.76MiB/s ETA 00:00
+[download]  66.5% of    3.01MiB at   12.76MiB/s ETA 00:00
+[download] 100.0% of    3.01MiB at   14.94MiB/s ETA 00:00
+[download] 100% of    3.01MiB in 00:00:00 at 9.97MiB/s
+[ExtractAudio] Destination: C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\tmp_4dfaf35c76cff8cd.mp3
+Deleting original file C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\tmp_4dfaf35c76cff8cd.webm (pass -k to keep)
+ffmpeg version 8.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+  built with gcc 15.2.0 (Rev11, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-cairo --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-openal --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      60. 26.100 / 60. 26.100
+  libavcodec     62. 28.100 / 62. 28.100
+  libavformat    62. 12.100 / 62. 12.100
+  libavdevice    62.  3.100 / 62.  3.100
+  libavfilter    11. 14.100 / 11. 14.100
+  libswscale      9.  5.100 /  9.  5.100
+  libswresample   6.  3.100 /  6.  3.100
+Input #0, mp3, from 'C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\tmp_4dfaf35c76cff8cd.mp3':
+  Metadata:
+    encoder         : Lavf62.12.100
+  Duration: 00:03:11.82, start: 0.023021, bitrate: 192 kb/s
+  Stream #0:0: Audio: mp3 (mp3float), 48000 Hz, stereo, fltp, 192 kb/s, start 0.023021
+    Metadata:
+      encoder         : Lavc62.28
+Stream mapping:
+  Stream #0:0 -> #0:0 (copy)
+Output #0, mp3, to 'C:\xampp\htdocs\Personal\projects\yt-mp3\downloads\4dfaf35c76cff8cd_lexycat - glitter ♪ ₊˚♬ Nightcore.mp3':
+  Metadata:
+    TALB            : lexycat
+    TIT2            : glitter ♪ ₊˚♬ Nightcore
+    TPE1            : lexycat
+    TSSE            : Lavf62.12.100
+  Stream #0:0: Audio: mp3, 48000 Hz, stereo, fltp, 192 kb/s
+    Metadata:
+      encoder         : Lavc62.28
+Press [q] to stop, [?] for help
+[out#0/mp3 @ 0000020143b3cd80] video:0KiB audio:4497KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.015224%
+size=    4497KiB time=00:03:11.83 bitrate= 192.1kbits/s speed=2.23e+03x elapsed=0:00:00.08    
