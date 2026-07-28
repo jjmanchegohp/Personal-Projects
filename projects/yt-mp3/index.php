@@ -40,12 +40,8 @@
   <div id="preview-card" style="display:none">
     <img id="preview-thumb" src="" alt="">
     <div class="preview-fields">
-      <label>Artista / Banda
-        <input type="text" id="artist-input">
-      </label>
-      <label>Título de la canción
-        <input type="text" id="title-input">
-      </label>
+      <label>Artista / Banda <input type="text" id="artist-input"></label>
+      <label>Título de la canción <input type="text" id="title-input"></label>
     </div>
   </div>
   <div id="prog-area">
@@ -140,7 +136,7 @@ async function loadPreview() {
     } else {
       $('preview-thumb').style.display = 'none';
     }
-    $('preview-card').style.display = 'block';
+    $('preview-card').style.display = 'flex';
     previewReady = true;
   } catch(e) {
     showErr(e.message);

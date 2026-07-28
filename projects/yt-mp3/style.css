@@ -141,6 +141,59 @@ h1 em {
 #go-btn:hover:not(:disabled) { background: #333; }
 #go-btn:disabled { opacity: .35; cursor: not-allowed; }
 
+#preview-card {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--black);
+  border-top: none;
+  padding: 1.6rem 1.4rem;
+  margin-top: -2.5rem;
+  margin-bottom: 2.5rem;
+  gap: 1.2rem;
+}
+
+#preview-thumb {
+  display: none;
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.preview-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  width: 100%;
+}
+
+.preview-fields label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--mid);
+}
+
+.preview-fields input {
+  display: block;
+  width: 100%;
+  margin-top: .5rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  padding: .5rem 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--black);
+  background: transparent;
+  transition: border-color .2s;
+}
+
+.preview-fields input:focus { border-bottom-color: var(--black); }
+
 #prog-area { display: none; margin-bottom: 2rem; }
 
 .prog-row {
