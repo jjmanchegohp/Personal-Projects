@@ -26,16 +26,47 @@
         <button class="folder-btn" id="pickBtn">Elegir carpeta</button>
         <input type="file" id="dirInput" webkitdirectory directory multiple>
 
-        <div class="setting-row">
-          <span>Modo oscuro</span>
-          <label class="switch">
-            <input type="checkbox" id="darkToggle">
-            <span class="switch-track"></span>
-          </label>
+        <div class="setting-block">
+          <span>Imagen o vídeo personalizado</span>
+          <div class="video-setting-row">
+            <button class="mini-btn" id="pickVideoBtn">Elegir archivo</button>
+            <button class="mini-btn ghost" id="clearVideoBtn" title="Quitar">Quitar</button>
+          </div>
+          <input type="file" id="videoInput" accept="video/mp4,image/png,image/jpeg,image/gif">
+          <div class="settings-empty" id="videoStatus">Se muestra el disco por defecto</div>
         </div>
 
-        <div class="settings-list" id="settingsList">
-          <div class="settings-empty">Todavía no hay pistas cargadas</div>
+        <div class="setting-block">
+          <span>Colores</span>
+          <div class="color-grid">
+            <label class="color-field">
+              <span>Fondo página</span>
+              <input type="color" id="colorPageBg">
+            </label>
+            <label class="color-field">
+              <span>Tarjetas</span>
+              <input type="color" id="colorPaper">
+            </label>
+            <label class="color-field">
+              <span>Texto</span>
+              <input type="color" id="colorInk">
+            </label>
+            <label class="color-field">
+              <span>Acento</span>
+              <input type="color" id="colorTeal">
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-block last">
+          <span>Imagen de fondo de página</span>
+          <div class="video-setting-row">
+            <button class="mini-btn" id="pickBgImageBtn">Elegir imagen</button>
+            <button class="mini-btn ghost" id="clearBgImageBtn">Quitar</button>
+          </div>
+          <input type="file" id="bgImageInput" accept="image/png,image/jpeg,image/gif,image/webp">
+          <div class="settings-empty" id="bgImageStatus">Sin imagen de fondo</div>
+          <button class="mini-btn ghost reset-btn" id="resetColorsBtn">Restablecer colores</button>
         </div>
       </div>
     </div>
@@ -54,7 +85,7 @@
     </div>
 
     <div class="meta">
-      <div class="song-name" id="songName">Sin pista seleccionada</div>
+      <div class="song-name" id="songName"><span class="song-name-inner" id="songNameInner">Sin pista seleccionada</span></div>
       <div class="song-artist" id="songArtist">Elige una carpeta en configuración</div>
     </div>
 
@@ -89,7 +120,7 @@
   <div class="sidebar">
     <h2>SIDE BAR</h2>
     <div class="queue-list" id="queueList">
-      <div class="queue-empty">Sin próximas canciones</div>
+      <div class="queue-empty">Todavía no hay pistas cargadas</div>
     </div>
   </div>
 
@@ -97,233 +128,7 @@
 
 <audio id="audio"></audio>
 
-<script>
-const AUDIO_EXT = ['mp3','wav','ogg','m4a','mp4','flac','aac','oga','webm'];
-const VIDEO_COVER_EXT = ['m4a','mp4','aac']; // contenedores MP4 donde intentamos leer la portada
-
-const gearBtn = document.getElementById('gearBtn');
-const settingsPanel = document.getElementById('settingsPanel');
-const dirInput = document.getElementById('dirInput');
-const pickBtn = document.getElementById('pickBtn');
-const settingsList = document.getElementById('settingsList');
-const darkToggle = document.getElementById('darkToggle');
-const queueList = document.getElementById('queueList');
-
-const audio = document.getElementById('audio');
-const songName = document.getElementById('songName');
-const songArtist = document.getElementById('songArtist');
-const playBtn = document.getElementById('playBtn');
-const playIcon = document.getElementById('playIcon');
-const replayBtn = document.getElementById('replayBtn');
-const nextBtn = document.getElementById('nextBtn');
-const progressWrap = document.getElementById('progressWrap');
-const progressFill = document.getElementById('progressFill');
-const curTime = document.getElementById('curTime');
-const durTime = document.getElementById('durTime');
-const emptyHint = document.getElementById('emptyHint');
-const artFrame = document.getElementById('artFrame');
-
-const DISC_SVG = `<svg viewBox="0 0 150 150">
-  <circle cx="75" cy="75" r="70" fill="#171512"/>
-  <circle cx="75" cy="75" r="70" fill="none" stroke="#3a362e" stroke-width="1"/>
-  <circle cx="75" cy="75" r="55" fill="none" stroke="#3a362e" stroke-width="1"/>
-  <circle cx="75" cy="75" r="40" fill="none" stroke="#3a362e" stroke-width="1"/>
-  <circle cx="75" cy="75" r="24" fill="#2f8f83"/>
-  <circle cx="75" cy="75" r="5" fill="#171512"/>
-</svg>`;
-
-let tracks = []; // {title, artist, url, file, ext}
-let currentIndex = -1;
-let isPlaying = false;
-
-// --- modo oscuro ---
-darkToggle.addEventListener('change', () => {
-  document.body.classList.toggle('dark', darkToggle.checked);
-});
-
-// --- menu configuración ---
-gearBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  settingsPanel.classList.toggle('open');
-});
-document.addEventListener('click', (e) => {
-  if(!settingsPanel.contains(e.target) && e.target !== gearBtn){
-    settingsPanel.classList.remove('open');
-  }
-});
-
-pickBtn.addEventListener('click', () => dirInput.click());
-
-dirInput.addEventListener('change', (e) => {
-  const files = Array.from(e.target.files).filter(f => {
-    const ext = f.name.split('.').pop().toLowerCase();
-    return AUDIO_EXT.includes(ext);
-  });
-
-  tracks.forEach(t => URL.revokeObjectURL(t.url));
-
-  tracks = files
-    .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}))
-    .map(f => {
-      const ext = f.name.split('.').pop().toLowerCase();
-      const raw = f.name.replace(/\.[^/.]+$/, '');
-      let title = raw, artist = 'Artista desconocido';
-      if(raw.includes(' - ')){
-        const parts = raw.split(' - ');
-        artist = parts[0].trim();
-        title = parts.slice(1).join(' - ').trim();
-      }
-      return { title, artist, url: URL.createObjectURL(f), file: f, ext };
-    });
-
-  currentIndex = -1;
-  renderSettingsList();
-  renderQueue();
-  if(tracks.length > 0){
-    settingsPanel.classList.remove('open');
-    playTrack(0);
-  }
-});
-
-function renderSettingsList(){
-  if(tracks.length === 0){
-    settingsList.innerHTML = '<div class="settings-empty">Todavía no hay pistas cargadas</div>';
-    return;
-  }
-  settingsList.innerHTML = tracks.map((t, i) => `
-    <div class="s-track ${i === currentIndex ? 'active' : ''}" data-index="${i}">
-      <span class="s-idx">${String(i+1).padStart(2,'0')}</span>
-      <span class="s-name">${escapeHtml(t.title)}</span>
-    </div>
-  `).join('');
-  settingsList.querySelectorAll('.s-track').forEach(el => {
-    el.addEventListener('click', () => playTrack(parseInt(el.dataset.index)));
-  });
-}
-
-// --- sidebar: próximas canciones en cola ---
-function renderQueue(){
-  if(tracks.length <= 1 || currentIndex === -1){
-    queueList.innerHTML = '<div class="queue-empty">Sin próximas canciones</div>';
-    return;
-  }
-  const upcoming = [];
-  for(let i = 1; i < tracks.length; i++){
-    const idx = (currentIndex + i) % tracks.length;
-    upcoming.push(idx);
-  }
-  queueList.innerHTML = upcoming.map(idx => `
-    <div class="queue-item" data-index="${idx}">${escapeHtml(tracks[idx].title)}</div>
-  `).join('');
-  queueList.querySelectorAll('.queue-item').forEach(el => {
-    el.addEventListener('click', () => playTrack(parseInt(el.dataset.index)));
-  });
-}
-
-function escapeHtml(s){
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-
-function playTrack(index){
-  if(index < 0 || index >= tracks.length) return;
-  currentIndex = index;
-  const t = tracks[index];
-  audio.src = t.url;
-  audio.play();
-  isPlaying = true;
-  updatePlayIcon();
-  songName.textContent = t.title;
-  songArtist.textContent = t.artist;
-  emptyHint.style.display = 'none';
-  renderSettingsList();
-  renderQueue();
-  loadArtwork(t);
-}
-
-function showDisc(){
-  artFrame.innerHTML = DISC_SVG;
-}
-
-function loadArtwork(track){
-  // Por defecto: disco genérico (mp3, wav, ogg, flac...)
-  if(!VIDEO_COVER_EXT.includes(track.ext) || typeof jsmediatags === 'undefined'){
-    showDisc();
-    return;
-  }
-  // Contenedor MP4 (m4a/mp4/aac): intentamos extraer la portada incrustada
-  jsmediatags.read(track.file, {
-    onSuccess: (tag) => {
-      const pic = tag.tags && tag.tags.picture;
-      if(pic && pic.data){
-        const bytes = new Uint8Array(pic.data);
-        let binary = '';
-        for(let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const b64 = btoa(binary);
-        artFrame.innerHTML = `<img src="data:${pic.format};base64,${b64}" alt="Portada">`;
-      } else {
-        showDisc();
-      }
-    },
-    onError: () => showDisc()
-  });
-}
-
-function updatePlayIcon(){
-  playIcon.innerHTML = isPlaying
-    ? '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>'
-    : '<path d="M8 5v14l11-7z"/>';
-}
-
-playBtn.addEventListener('click', () => {
-  if(currentIndex === -1){
-    if(tracks.length > 0) playTrack(0);
-    return;
-  }
-  if(isPlaying){ audio.pause(); isPlaying = false; }
-  else { audio.play(); isPlaying = true; }
-  updatePlayIcon();
-});
-
-replayBtn.addEventListener('click', () => {
-  if(currentIndex === -1) return;
-  audio.currentTime = 0;
-  audio.play();
-  isPlaying = true;
-  updatePlayIcon();
-});
-
-nextBtn.addEventListener('click', () => {
-  if(tracks.length === 0) return;
-  const i = currentIndex >= tracks.length - 1 ? 0 : currentIndex + 1;
-  playTrack(i);
-});
-
-audio.addEventListener('ended', () => nextBtn.click());
-
-audio.addEventListener('timeupdate', () => {
-  if(!isNaN(audio.duration) && audio.duration > 0){
-    progressFill.style.width = (audio.currentTime / audio.duration * 100) + '%';
-    curTime.textContent = formatTime(audio.currentTime);
-    durTime.textContent = formatTime(audio.duration);
-  }
-});
-
-progressWrap.addEventListener('click', (e) => {
-  if(isNaN(audio.duration) || currentIndex === -1) return;
-  const rect = progressWrap.getBoundingClientRect();
-  const ratio = (e.clientX - rect.left) / rect.width;
-  audio.currentTime = ratio * audio.duration;
-});
-
-function formatTime(sec){
-  if(isNaN(sec)) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
-</script>
+<script src="functions/player.js"></script>
 
 </body>
 </html>

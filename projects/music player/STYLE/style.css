@@ -6,6 +6,7 @@
   --sub: #9c9686;
   --track-bg: #e4e1d8;
   --panel-shadow: #171512;
+  --page-bg: #eeece5;
 }
 body.dark{
   --ink: #f1efe8;
@@ -15,6 +16,7 @@ body.dark{
   --sub: #837c6c;
   --track-bg: #3a362e;
   --panel-shadow: #000000;
+  --page-bg: #0f0e0c;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
 body{
@@ -22,12 +24,14 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-  background: #eeece5;
+  background: var(--page-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
   padding: 24px;
-  transition: background 0.25s ease;
+  transition: background-color 0.25s ease;
 }
-body.dark{ background: #0f0e0c; }
 
 .app{
   display:flex;
@@ -38,13 +42,11 @@ body.dark{ background: #0f0e0c; }
 /* ---------- tarjeta principal ---------- */
 .card{
   position: relative;
-  width: 380px;
-  background:
-    radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0/16px 16px,
-    var(--paper);
+  width: 520px;
+  background: var(--paper);
   border: 3px solid var(--ink);
   border-radius: 10px;
-  padding: 22px 26px 26px;
+  padding: 30px 36px 36px;
   overflow: visible;
   transition: background 0.25s ease, border-color 0.25s ease;
 }
@@ -55,7 +57,7 @@ body.dark{ background: #0f0e0c; }
   margin-bottom: 4px;
 }
 .gear-btn{
-  width: 34px; height: 34px;
+  width: 40px; height: 40px;
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: var(--paper);
@@ -64,13 +66,15 @@ body.dark{ background: #0f0e0c; }
   transition: transform 0.2s ease;
 }
 .gear-btn:hover{ transform: rotate(25deg); }
-.gear-btn svg{ width: 18px; height: 18px; stroke: var(--ink); }
+.gear-btn svg{ width: 21px; height: 21px; stroke: var(--ink); }
 
 .settings-panel{
   position: absolute;
-  top: 56px;
+  top: 62px;
   right: 22px;
-  width: 270px;
+  width: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
   background: var(--paper);
   border: 2.5px solid var(--ink);
   border-radius: 8px;
@@ -112,6 +116,85 @@ body.dark{ background: #0f0e0c; }
 }
 .setting-row span{ font-size: 13px; color: var(--ink); }
 
+.setting-block{
+  padding: 2px 2px 12px;
+  border-bottom: 1px solid var(--dot);
+  margin-bottom: 10px;
+}
+.setting-block.last{
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 2px;
+}
+.setting-block > span{
+  display:block;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.video-setting-row{
+  display:flex;
+  gap: 8px;
+}
+.mini-btn{
+  flex: 1;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mini-btn:hover{ opacity: 0.85; }
+.mini-btn.ghost{
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+}
+#videoInput{ display:none; }
+#videoStatus{ padding-top: 8px; }
+
+.color-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.color-field{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+.color-field span{
+  font-size: 12px;
+  color: var(--ink);
+}
+.color-field input[type=color]{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.color-field input[type=color]::-webkit-color-swatch-wrapper{ padding: 2px; }
+.color-field input[type=color]::-webkit-color-swatch{ border: none; border-radius: 3px; }
+
+#bgImageInput{ display:none; }
+#bgImageStatus{ padding-top: 8px; }
+
+.reset-btn{
+  width: 100%;
+  margin-top: 12px;
+}
+
 .switch{
   position: relative;
   width: 40px; height: 22px;
@@ -138,11 +221,6 @@ body.dark{ background: #0f0e0c; }
 .switch input:checked + .switch-track::before{ transform: translateX(16px); }
 .switch input:checked + .switch-track{ background: var(--teal); }
 
-.settings-list{
-  max-height: 220px;
-  overflow-y: auto;
-  border-top: 1px solid var(--dot);
-}
 .settings-empty{
   font-size: 12px;
   color: var(--sub);
@@ -171,33 +249,44 @@ body.dark{ background: #0f0e0c; }
   padding: 10px 0 18px;
 }
 .art-frame{
-  width: 150px;
-  height: 150px;
+  width: 260px;
+  height: 260px;
   border-radius: 10px;
   display:flex;
   align-items:center;
   justify-content:center;
   overflow: hidden;
 }
-.art-frame img{
+.art-frame img,
+.art-frame video{
   width: 100%; height: 100%;
   object-fit: cover;
   border-radius: 10px;
   border: 2px solid var(--ink);
 }
-.art-frame svg{ width: 150px; height: 150px; }
+.art-frame svg{ width: 260px; height: 260px; }
 
 .meta{ padding: 0 2px; }
 .song-name{
-  font-size: 26px;
+  font-size: 34px;
   color: var(--ink);
   font-weight: 400;
   white-space: nowrap;
-  overflow:hidden;
-  text-overflow: ellipsis;
+  overflow: hidden;
+  position: relative;
+}
+.song-name-inner{
+  display: inline-block;
+  white-space: nowrap;
+  transform: translateX(0);
+  transition: transform 0.35s ease;
+}
+.song-name.overflow:hover .song-name-inner{
+  transform: translateX(calc(-1 * var(--scroll-dist, 0px)));
+  transition: transform 2.6s linear;
 }
 .song-artist{
-  font-size: 13px;
+  font-size: 16px;
   color: var(--teal);
   font-weight: 600;
   margin-top: 2px;
@@ -206,7 +295,7 @@ body.dark{ background: #0f0e0c; }
 .progress-wrap{
   margin: 18px 2px 6px;
   position: relative;
-  height: 4px;
+  height: 5px;
   background: var(--track-bg);
   border-radius: 3px;
   cursor: pointer;
@@ -237,10 +326,10 @@ body.dark{ background: #0f0e0c; }
   color: var(--ink);
   display:flex; align-items:center; justify-content:center;
 }
-.ctrl-btn svg{ width: 26px; height: 26px; stroke: var(--ink); fill:none; }
+.ctrl-btn svg{ width: 32px; height: 32px; stroke: var(--ink); fill:none; }
 
 .play-btn{
-  width: 62px; height: 62px;
+  width: 80px; height: 80px;
   border-radius: 50%;
   border: 3px solid var(--ink);
   background: var(--paper);
@@ -249,9 +338,9 @@ body.dark{ background: #0f0e0c; }
   transition: transform 0.12s ease;
 }
 .play-btn:hover{ transform: scale(1.05); }
-.play-btn svg{ width: 24px; height: 24px; fill: var(--ink); stroke:none; }
+.play-btn svg{ width: 32px; height: 32px; fill: var(--ink); stroke:none; }
 
-.next-btn svg{ fill: var(--ink); stroke:none; width: 24px; height: 24px; }
+.next-btn svg{ fill: var(--ink); stroke:none; width: 30px; height: 30px; }
 
 .empty-hint{
   text-align:center;
@@ -263,27 +352,30 @@ body.dark{ background: #0f0e0c; }
 
 /* ---------- sidebar de próximas canciones ---------- */
 .sidebar{
-  width: 220px;
-  background:
-    radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0/16px 16px,
-    var(--paper);
+  width: 300px;
+  background: var(--paper);
   border: 3px solid var(--ink);
   border-radius: 10px;
-  padding: 18px 20px;
-  min-height: 300px;
+  padding: 24px 26px;
+  height: 610px;
+  display: flex;
+  flex-direction: column;
   transition: background 0.25s ease, border-color 0.25s ease;
 }
 .sidebar h2{
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 1.5px;
   color: var(--ink);
   margin-bottom: 16px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 .queue-list{
   display:flex;
   flex-direction: column;
-  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
 }
 .queue-empty{
   font-size: 12px;
@@ -291,18 +383,47 @@ body.dark{ background: #0f0e0c; }
   font-style: italic;
 }
 .queue-item{
-  font-size: 13px;
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  font-size: 15px;
   color: var(--ink);
-  padding-bottom: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
   border-bottom: 2px solid var(--ink);
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .queue-item:hover{ color: var(--teal); border-color: var(--teal); }
+.queue-item.active{ color: var(--teal); border-color: var(--teal); font-weight: 700; }
 
-@media (max-width: 660px){
+.queue-idx{
+  color: var(--sub);
+  font-size: 12px;
+  width: 20px;
+  flex-shrink: 0;
+}
+.queue-item.active .queue-idx{ color: var(--teal); }
+
+.queue-text{
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+.queue-item-inner{
+  display: inline-block;
+  white-space: nowrap;
+  transform: translateX(0);
+}
+.queue-item.overflow:hover .queue-item-inner{
+  transform: translateX(calc(-1 * var(--scroll-dist, 0px)));
+  transition: transform 2.2s linear;
+}
+.queue-item-inner{
+  transition: transform 0.35s ease;
+}
+
+@media (max-width: 900px){
   .app{ flex-direction: column; align-items: center; }
-  .sidebar{ width: 380px; }
+  .sidebar{ width: 520px; }
 }
