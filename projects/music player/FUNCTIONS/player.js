@@ -1,5 +1,6 @@
 const AUDIO_EXT = ['mp3','wav','ogg','m4a','mp4','flac','aac','oga','webm'];
 const VIDEO_COVER_EXT = ['m4a','mp4','aac']; // contenedores MP4 donde intentamos leer la portada
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
 
 const gearBtn = document.getElementById('gearBtn');
 const settingsPanel = document.getElementById('settingsPanel');
@@ -49,121 +50,93 @@ let currentIndex = -1;
 let isPlaying = false;
 let customMediaUrl = null;
 let customMediaType = null; // 'video' | 'image'
-
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
-
-// --- imagen/gif/vídeo personalizado en lugar del disco ---
-pickVideoBtn.addEventListener('click', () => videoInput.click());
-
-videoInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-
-  const isVideo = file.type === 'video/mp4';
-  const isImage = IMAGE_TYPES.includes(file.type);
-  if(!isVideo && !isImage){
-    videoStatus.textContent = 'Formato no compatible (usa png, jpg, gif o mp4)';
-    return;
-  }
-
-  if(customMediaUrl) URL.revokeObjectURL(customMediaUrl);
-  customMediaUrl = URL.createObjectURL(file);
-  customMediaType = isVideo ? 'video' : 'image';
-  videoStatus.textContent = `Usando: ${file.name}`;
-  if(currentIndex !== -1) loadArtwork(tracks[currentIndex]);
-  else showCustomMedia();
-});
-
-clearVideoBtn.addEventListener('click', () => {
-  if(customMediaUrl) URL.revokeObjectURL(customMediaUrl);
-  customMediaUrl = null;
-  customMediaType = null;
-  videoInput.value = '';
-  videoStatus.textContent = 'Se muestra el disco por defecto';
-  if(currentIndex !== -1) loadArtwork(tracks[currentIndex]);
-  else showDisc();
-});
-
-function showCustomMedia(){
-  if(customMediaType === 'video'){
-    artFrame.innerHTML = `<video src="${customMediaUrl}" autoplay loop muted playsinline></video>`;
-  } else {
-    artFrame.innerHTML = `<img src="${customMediaUrl}" alt="Imagen personalizada">`;
-  }
-}
-
-// --- menu configuración ---
-gearBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const opening = !settingsPanel.classList.contains('open');
-  settingsPanel.classList.toggle('open');
-  if(opening) syncColorInputs();
-});
-document.addEventListener('click', (e) => {
-  if(!settingsPanel.contains(e.target) && e.target !== gearBtn){
-    settingsPanel.classList.remove('open');
-  }
-});
-
-// --- personalización de colores ---
-const THEME_VARS = {
-  colorPageBg: '--page-bg',
-  colorPaper: '--paper',
-  colorInk: '--ink',
-  colorTeal: '--teal'
-};
-
-function toHex(color){
-  // normaliza cualquier color computado (rgb(...) o #hex) a formato #rrggbb para el <input type=color>
-  if(color.startsWith('#')) return color;
-  const m = color.match(/\d+/g);
-  if(!m) return '#000000';
-  return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
-}
-
-function syncColorInputs(){
-  const computed = getComputedStyle(document.body);
-  colorPageBg.value = toHex(computed.getPropertyValue('--page-bg').trim());
-  colorPaper.value = toHex(computed.getPropertyValue('--paper').trim());
-  colorInk.value = toHex(computed.getPropertyValue('--ink').trim());
-  colorTeal.value = toHex(computed.getPropertyValue('--teal').trim());
-}
-
-[colorPageBg, colorPaper, colorInk, colorTeal].forEach(input => {
-  input.addEventListener('input', () => {
-    const varName = THEME_VARS[input.id];
-    document.body.style.setProperty(varName, input.value);
-  });
-});
-
-resetColorsBtn.addEventListener('click', () => {
-  Object.values(THEME_VARS).forEach(varName => document.body.style.removeProperty(varName));
-  clearBgImageBtn.click();
-  syncColorInputs();
-});
-
-// --- imagen de fondo de página ---
 let customBgUrl = null;
 
-pickBgImageBtn.addEventListener('click', () => bgImageInput.click());
+/* =========================================================
+   PERSISTENCIA (IndexedDB): Firefox/Zen no soportan la API
+   de "handles" de carpeta (eso es solo Chromium), así que aquí
+   guardamos directamente una copia de cada archivo (blob) en
+   IndexedDB. Así no hace falta volver a elegir la carpeta.
+   ========================================================= */
+const DB_NAME = 'musicPlayerStore';
+const DB_VERSION = 1;
+let dbPromise = null;
 
-bgImageInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  if(customBgUrl) URL.revokeObjectURL(customBgUrl);
-  customBgUrl = URL.createObjectURL(file);
-  document.body.style.backgroundImage = `url(${customBgUrl})`;
-  bgImageStatus.textContent = `Usando: ${file.name}`;
-});
+function openDB(){
+  if(dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB no disponible')); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains('tracks')){
+        db.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+      }
+      if(!db.objectStoreNames.contains('settings')){
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
 
-clearBgImageBtn.addEventListener('click', () => {
-  if(customBgUrl) URL.revokeObjectURL(customBgUrl);
-  customBgUrl = null;
-  bgImageInput.value = '';
-  document.body.style.backgroundImage = '';
-  bgImageStatus.textContent = 'Sin imagen de fondo';
-});
+async function idbSetSetting(key, value){
+  try{
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('settings', 'readwrite');
+      tx.objectStore('settings').put({ key, value });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(err){ console.warn('No se pudo guardar la configuración:', err); }
+}
 
+async function idbGetSetting(key){
+  try{
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('settings', 'readonly');
+      const req = tx.objectStore('settings').get(key);
+      req.onsuccess = () => resolve(req.result ? req.result.value : undefined);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(err){ console.warn('No se pudo leer la configuración:', err); return undefined; }
+}
+
+async function idbReplaceTracks(trackList){
+  try{
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('tracks', 'readwrite');
+      const store = tx.objectStore('tracks');
+      store.clear();
+      trackList.forEach((t, i) => {
+        store.add({ order: i, title: t.title, artist: t.artist, ext: t.ext, blob: t.file });
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(err){ console.warn('No se pudo guardar la biblioteca:', err); }
+}
+
+async function idbGetAllTracks(){
+  try{
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('tracks', 'readonly');
+      const req = tx.objectStore('tracks').getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(err){ console.warn('No se pudo leer la biblioteca:', err); return []; }
+}
+
+/* =========================================================
+   CARPETA DE MÚSICA
+   ========================================================= */
 pickBtn.addEventListener('click', () => dirInput.click());
 
 dirInput.addEventListener('change', (e) => {
@@ -190,13 +163,146 @@ dirInput.addEventListener('change', (e) => {
 
   currentIndex = -1;
   renderQueue();
+  idbReplaceTracks(tracks);
+  idbSetSetting('lastIndex', null);
   if(tracks.length > 0){
     settingsPanel.classList.remove('open');
     playTrack(0);
   }
 });
 
-// --- sidebar: biblioteca completa de pistas cargadas ---
+/* =========================================================
+   IMAGEN/VÍDEO PERSONALIZADO EN LUGAR DEL DISCO
+   ========================================================= */
+pickVideoBtn.addEventListener('click', () => videoInput.click());
+
+videoInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const isVideo = file.type === 'video/mp4';
+  const isImage = IMAGE_TYPES.includes(file.type);
+  if(!isVideo && !isImage){
+    videoStatus.textContent = 'Formato no compatible (usa png, jpg, gif o mp4)';
+    return;
+  }
+
+  if(customMediaUrl) URL.revokeObjectURL(customMediaUrl);
+  customMediaUrl = URL.createObjectURL(file);
+  customMediaType = isVideo ? 'video' : 'image';
+  videoStatus.textContent = `Usando: ${file.name}`;
+  idbSetSetting('customMedia', { blob: file, type: customMediaType, name: file.name });
+  if(currentIndex !== -1) loadArtwork(tracks[currentIndex]);
+  else showCustomMedia();
+});
+
+clearVideoBtn.addEventListener('click', () => {
+  if(customMediaUrl) URL.revokeObjectURL(customMediaUrl);
+  customMediaUrl = null;
+  customMediaType = null;
+  videoInput.value = '';
+  videoStatus.textContent = 'Se muestra el disco por defecto';
+  idbSetSetting('customMedia', null);
+  if(currentIndex !== -1) loadArtwork(tracks[currentIndex]);
+  else showDisc();
+});
+
+function showCustomMedia(){
+  if(customMediaType === 'video'){
+    artFrame.innerHTML = `<video src="${customMediaUrl}" autoplay loop muted playsinline></video>`;
+  } else {
+    artFrame.innerHTML = `<img src="${customMediaUrl}" alt="Imagen personalizada">`;
+  }
+}
+
+/* =========================================================
+   MENÚ CONFIGURACIÓN
+   ========================================================= */
+gearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const opening = !settingsPanel.classList.contains('open');
+  settingsPanel.classList.toggle('open');
+  if(opening) syncColorInputs();
+});
+document.addEventListener('click', (e) => {
+  if(!settingsPanel.contains(e.target) && e.target !== gearBtn){
+    settingsPanel.classList.remove('open');
+  }
+});
+
+/* =========================================================
+   COLORES
+   ========================================================= */
+const THEME_VARS = {
+  colorPageBg: '--page-bg',
+  colorPaper: '--paper',
+  colorInk: '--ink',
+  colorTeal: '--teal'
+};
+const COLOR_INPUTS = [colorPageBg, colorPaper, colorInk, colorTeal];
+
+function toHex(color){
+  if(color.startsWith('#')) return color;
+  const m = color.match(/\d+/g);
+  if(!m) return '#000000';
+  return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+}
+
+function syncColorInputs(){
+  const computed = getComputedStyle(document.body);
+  colorPageBg.value = toHex(computed.getPropertyValue('--page-bg').trim());
+  colorPaper.value = toHex(computed.getPropertyValue('--paper').trim());
+  colorInk.value = toHex(computed.getPropertyValue('--ink').trim());
+  colorTeal.value = toHex(computed.getPropertyValue('--teal').trim());
+}
+
+function persistTheme(){
+  const data = {};
+  COLOR_INPUTS.forEach(inp => data[inp.id] = inp.value);
+  idbSetSetting('theme', data);
+}
+
+COLOR_INPUTS.forEach(input => {
+  input.addEventListener('input', () => {
+    document.body.style.setProperty(THEME_VARS[input.id], input.value);
+    persistTheme();
+  });
+});
+
+resetColorsBtn.addEventListener('click', () => {
+  Object.values(THEME_VARS).forEach(varName => document.body.style.removeProperty(varName));
+  idbSetSetting('theme', null);
+  clearBgImageBtn.click();
+  syncColorInputs();
+});
+
+/* =========================================================
+   IMAGEN DE FONDO DE PÁGINA
+   ========================================================= */
+pickBgImageBtn.addEventListener('click', () => bgImageInput.click());
+
+bgImageInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(customBgUrl) URL.revokeObjectURL(customBgUrl);
+  customBgUrl = URL.createObjectURL(file);
+  document.body.style.backgroundImage = `url(${customBgUrl})`;
+  bgImageStatus.textContent = `Usando: ${file.name}`;
+  idbSetSetting('bgImage', { blob: file, name: file.name });
+});
+
+clearBgImageBtn.addEventListener('click', () => {
+  if(customBgUrl) URL.revokeObjectURL(customBgUrl);
+  customBgUrl = null;
+  bgImageInput.value = '';
+  document.body.style.backgroundImage = '';
+  bgImageStatus.textContent = 'Sin imagen de fondo';
+  idbSetSetting('bgImage', null);
+});
+
+/* =========================================================
+   COLA / LISTA DE PISTAS
+   ========================================================= */
 function renderQueue(){
   if(tracks.length === 0){
     queueList.innerHTML = '<div class="queue-empty">Todavía no hay pistas cargadas</div>';
@@ -210,8 +316,6 @@ function renderQueue(){
   `).join('');
   queueList.querySelectorAll('.queue-item').forEach(el => {
     el.addEventListener('click', () => playTrack(parseInt(el.dataset.index)));
-
-    // si el texto no cabe, habilitamos el scroll al pasar el ratón
     const textWrap = el.querySelector('.queue-text');
     const inner = el.querySelector('.queue-item-inner');
     const overflowPx = inner.scrollWidth - textWrap.clientWidth;
@@ -220,8 +324,6 @@ function renderQueue(){
       inner.style.setProperty('--scroll-dist', overflowPx + 'px');
     }
   });
-
-  // mantiene la pista activa visible dentro del scroll de la sidebar
   const activeEl = queueList.querySelector('.queue-item.active');
   if(activeEl) activeEl.scrollIntoView({ block: 'nearest' });
 }
@@ -232,13 +334,17 @@ function escapeHtml(s){
   return div.innerHTML;
 }
 
-function playTrack(index){
+function playTrack(index, autoplay = true){
   if(index < 0 || index >= tracks.length) return;
   currentIndex = index;
   const t = tracks[index];
   audio.src = t.url;
-  audio.play();
-  isPlaying = true;
+  if(autoplay){
+    audio.play();
+    isPlaying = true;
+  } else {
+    isPlaying = false;
+  }
   updatePlayIcon();
   songNameInner.textContent = t.title;
   songArtist.textContent = t.artist;
@@ -253,6 +359,7 @@ function playTrack(index){
   emptyHint.style.display = 'none';
   renderQueue();
   loadArtwork(t);
+  idbSetSetting('lastIndex', index);
 }
 
 function showDisc(){
@@ -260,17 +367,14 @@ function showDisc(){
 }
 
 function loadArtwork(track){
-  // si hay una imagen/gif/vídeo personalizado activo, tiene prioridad sobre todo lo demás
   if(customMediaUrl){
     showCustomMedia();
     return;
   }
-  // por defecto: disco genérico (mp3, wav, ogg, flac...)
   if(!VIDEO_COVER_EXT.includes(track.ext) || typeof jsmediatags === 'undefined'){
     showDisc();
     return;
   }
-  // Contenedor MP4 (m4a/mp4/aac): intentamos extraer la portada incrustada
   jsmediatags.read(track.file, {
     onSuccess: (tag) => {
       const pic = tag.tags && tag.tags.picture;
@@ -342,4 +446,54 @@ function formatTime(sec){
   return `${m}:${s}`;
 }
 
-syncColorInputs();
+/* =========================================================
+   RESTAURAR SESIÓN AL CARGAR LA PÁGINA
+   ========================================================= */
+async function init(){
+  const theme = await idbGetSetting('theme');
+  if(theme){
+    COLOR_INPUTS.forEach(inp => {
+      if(theme[inp.id]) document.body.style.setProperty(THEME_VARS[inp.id], theme[inp.id]);
+    });
+  }
+  syncColorInputs();
+
+  const bgImage = await idbGetSetting('bgImage');
+  if(bgImage && bgImage.blob){
+    customBgUrl = URL.createObjectURL(bgImage.blob);
+    document.body.style.backgroundImage = `url(${customBgUrl})`;
+    bgImageStatus.textContent = `Usando: ${bgImage.name}`;
+  }
+
+  const customMedia = await idbGetSetting('customMedia');
+  if(customMedia && customMedia.blob){
+    customMediaUrl = URL.createObjectURL(customMedia.blob);
+    customMediaType = customMedia.type;
+    videoStatus.textContent = `Usando: ${customMedia.name}`;
+  }
+
+  const storedTracks = await idbGetAllTracks();
+  if(storedTracks.length > 0){
+    tracks = storedTracks
+      .sort((a, b) => a.order - b.order)
+      .map(r => ({
+        title: r.title,
+        artist: r.artist,
+        ext: r.ext,
+        file: r.blob,
+        url: URL.createObjectURL(r.blob)
+      }));
+    renderQueue();
+
+    const lastIndex = await idbGetSetting('lastIndex');
+    if(typeof lastIndex === 'number' && lastIndex >= 0 && lastIndex < tracks.length){
+      playTrack(lastIndex, false);
+    } else if(customMediaUrl){
+      showCustomMedia();
+    }
+  } else if(customMediaUrl){
+    showCustomMedia();
+  }
+}
+
+init();
