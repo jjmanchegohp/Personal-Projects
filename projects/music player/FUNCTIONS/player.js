@@ -45,21 +45,24 @@ const DISC_SVG = `<svg viewBox="0 0 150 150">
   <circle cx="75" cy="75" r="5" fill="#171512"/>
 </svg>`;
 
-let tracks = []; // {title, artist, url, file, ext}
+let tracks = []; // {id, title, artist, ext, url, file} — url/file se rellenan al reproducir (carga perezosa)
 let currentIndex = -1;
 let isPlaying = false;
 let customMediaUrl = null;
 let customMediaType = null; // 'video' | 'image'
 let customBgUrl = null;
+let loadToken = 0; // evita que respuestas "viejas" (de un cambio de pista rápido) pisen a la actual
+let artworkCache = new Map(); // id -> html del arte ya resuelto, evita releer el mp4 cada vez
 
 /* =========================================================
-   PERSISTENCIA (IndexedDB): Firefox/Zen no soportan la API
-   de "handles" de carpeta (eso es solo Chromium), así que aquí
-   guardamos directamente una copia de cada archivo (blob) en
-   IndexedDB. Así no hace falta volver a elegir la carpeta.
+   PERSISTENCIA (IndexedDB)
+   Separamos metadatos (ligero) del audio en sí (pesado):
+   - trackMeta: id, order, title, artist, ext  -> se carga entero al inicio, es liviano
+   - trackBlobs: id -> blob del audio          -> se lee bajo demanda, solo la pista que vas a sonar
+   Esto evita cargar toda la biblioteca en memoria de una sola vez.
    ========================================================= */
 const DB_NAME = 'musicPlayerStore';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise = null;
 
 function openDB(){
@@ -69,11 +72,18 @@ function openDB(){
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if(!db.objectStoreNames.contains('tracks')){
-        db.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+      if(!db.objectStoreNames.contains('trackMeta')){
+        db.createObjectStore('trackMeta', { keyPath: 'id' });
+      }
+      if(!db.objectStoreNames.contains('trackBlobs')){
+        db.createObjectStore('trackBlobs');
       }
       if(!db.objectStoreNames.contains('settings')){
         db.createObjectStore('settings', { keyPath: 'key' });
+      }
+      // versión antigua (v1) guardaba todo junto en 'tracks'; ya no se usa
+      if(db.objectStoreNames.contains('tracks')){
+        db.deleteObjectStore('tracks');
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -110,11 +120,14 @@ async function idbReplaceTracks(trackList){
   try{
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction('tracks', 'readwrite');
-      const store = tx.objectStore('tracks');
-      store.clear();
+      const tx = db.transaction(['trackMeta', 'trackBlobs'], 'readwrite');
+      const metaStore = tx.objectStore('trackMeta');
+      const blobStore = tx.objectStore('trackBlobs');
+      metaStore.clear();
+      blobStore.clear();
       trackList.forEach((t, i) => {
-        store.add({ order: i, title: t.title, artist: t.artist, ext: t.ext, blob: t.file });
+        metaStore.put({ id: i, order: i, title: t.title, artist: t.artist, ext: t.ext });
+        blobStore.put(t.file, i);
       });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -122,16 +135,30 @@ async function idbReplaceTracks(trackList){
   } catch(err){ console.warn('No se pudo guardar la biblioteca:', err); }
 }
 
-async function idbGetAllTracks(){
+// Liviano: solo nombres/artista/orden, nada de audio real todavía
+async function idbGetAllTrackMeta(){
   try{
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction('tracks', 'readonly');
-      const req = tx.objectStore('tracks').getAll();
+      const tx = db.transaction('trackMeta', 'readonly');
+      const req = tx.objectStore('trackMeta').getAll();
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
   } catch(err){ console.warn('No se pudo leer la biblioteca:', err); return []; }
+}
+
+// Pesado: se llama solo para UNA pista, justo cuando se va a reproducir
+async function idbGetTrackBlob(id){
+  try{
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('trackBlobs', 'readonly');
+      const req = tx.objectStore('trackBlobs').get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(err){ console.warn('No se pudo leer el audio de la pista:', err); return null; }
 }
 
 /* =========================================================
@@ -145,11 +172,12 @@ dirInput.addEventListener('change', (e) => {
     return AUDIO_EXT.includes(ext);
   });
 
-  tracks.forEach(t => URL.revokeObjectURL(t.url));
+  tracks.forEach(t => { if(t.url) URL.revokeObjectURL(t.url); });
+  artworkCache.clear();
 
   tracks = files
     .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}))
-    .map(f => {
+    .map((f, i) => {
       const ext = f.name.split('.').pop().toLowerCase();
       const raw = f.name.replace(/\.[^/.]+$/, '');
       let title = raw, artist = 'Artista desconocido';
@@ -158,7 +186,8 @@ dirInput.addEventListener('change', (e) => {
         artist = parts[0].trim();
         title = parts.slice(1).join(' - ').trim();
       }
-      return { title, artist, url: URL.createObjectURL(f), file: f, ext };
+      // recién elegidos: ya tenemos el File real, no hace falta carga perezosa
+      return { id: i, title, artist, ext, url: URL.createObjectURL(f), file: f };
     });
 
   currentIndex = -1;
@@ -334,18 +363,13 @@ function escapeHtml(s){
   return div.innerHTML;
 }
 
-function playTrack(index, autoplay = true){
+async function playTrack(index, autoplay = true){
   if(index < 0 || index >= tracks.length) return;
+  const myToken = ++loadToken; // marca esta petición como "la más reciente"
   currentIndex = index;
   const t = tracks[index];
-  audio.src = t.url;
-  if(autoplay){
-    audio.play();
-    isPlaying = true;
-  } else {
-    isPlaying = false;
-  }
-  updatePlayIcon();
+
+  // datos visibles al instante (no dependen de tener el audio cargado)
   songNameInner.textContent = t.title;
   songArtist.textContent = t.artist;
   songName.classList.remove('overflow');
@@ -358,8 +382,35 @@ function playTrack(index, autoplay = true){
   });
   emptyHint.style.display = 'none';
   renderQueue();
-  loadArtwork(t);
   idbSetSetting('lastIndex', index);
+
+  // carga perezosa: si esta pista viene de una sesión restaurada, todavía
+  // no tiene el audio real en memoria — se trae ahora, solo ella
+  if(!t.url){
+    const blob = await idbGetTrackBlob(t.id);
+    if(myToken !== loadToken) return; // el usuario ya saltó a otra pista mientras cargaba esta
+    if(!blob) return;
+    t.file = blob;
+    t.url = URL.createObjectURL(blob);
+  }
+
+  if(myToken !== loadToken) return;
+
+  audio.src = t.url;
+  progressFill.style.width = '0%';
+  curTime.textContent = '0:00';
+  durTime.textContent = '0:00';
+
+  if(autoplay){
+    isPlaying = true;
+    updatePlayIcon();
+    audio.play().catch(() => { isPlaying = false; updatePlayIcon(); });
+  } else {
+    isPlaying = false;
+    updatePlayIcon();
+  }
+
+  loadArtwork(t);
 }
 
 function showDisc(){
@@ -375,17 +426,27 @@ function loadArtwork(track){
     showDisc();
     return;
   }
+  // ya la resolvimos antes en esta sesión: no releer el archivo de nuevo
+  if(artworkCache.has(track.id)){
+    artFrame.innerHTML = artworkCache.get(track.id);
+    return;
+  }
   jsmediatags.read(track.file, {
     onSuccess: (tag) => {
       const pic = tag.tags && tag.tags.picture;
+      let html;
       if(pic && pic.data){
         const bytes = new Uint8Array(pic.data);
         let binary = '';
         for(let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const b64 = btoa(binary);
-        artFrame.innerHTML = `<img src="data:${pic.format};base64,${b64}" alt="Portada">`;
+        html = `<img src="data:${pic.format};base64,${b64}" alt="Portada">`;
       } else {
-        showDisc();
+        html = DISC_SVG;
+      }
+      artworkCache.set(track.id, html);
+      if(currentIndex !== -1 && tracks[currentIndex].id === track.id){
+        artFrame.innerHTML = html;
       }
     },
     onError: () => showDisc()
@@ -403,17 +464,23 @@ playBtn.addEventListener('click', () => {
     if(tracks.length > 0) playTrack(0);
     return;
   }
-  if(isPlaying){ audio.pause(); isPlaying = false; }
-  else { audio.play(); isPlaying = true; }
-  updatePlayIcon();
+  if(isPlaying){
+    audio.pause();
+    isPlaying = false;
+    updatePlayIcon();
+  } else {
+    isPlaying = true;
+    updatePlayIcon();
+    audio.play().catch(() => { isPlaying = false; updatePlayIcon(); });
+  }
 });
 
 replayBtn.addEventListener('click', () => {
   if(currentIndex === -1) return;
   audio.currentTime = 0;
-  audio.play();
   isPlaying = true;
   updatePlayIcon();
+  audio.play().catch(() => { isPlaying = false; updatePlayIcon(); });
 });
 
 nextBtn.addEventListener('click', () => {
@@ -424,8 +491,28 @@ nextBtn.addEventListener('click', () => {
 
 audio.addEventListener('ended', () => nextBtn.click());
 
+// Arregla el bug de Chromium donde audio.duration da Infinity para
+// blobs sin cabecera de duración correcta (mp3 VBR mal etiquetados,
+// muy común). Sin esto la barra de progreso nunca avanza.
+audio.addEventListener('loadedmetadata', () => {
+  if(!isFinite(audio.duration)){
+    audio.currentTime = 1e101;
+    const fixDuration = () => {
+      audio.removeEventListener('timeupdate', fixDuration);
+      audio.currentTime = 0;
+    };
+    audio.addEventListener('timeupdate', fixDuration);
+  }
+});
+
+audio.addEventListener('durationchange', () => {
+  if(isFinite(audio.duration) && audio.duration > 0){
+    durTime.textContent = formatTime(audio.duration);
+  }
+});
+
 audio.addEventListener('timeupdate', () => {
-  if(!isNaN(audio.duration) && audio.duration > 0){
+  if(isFinite(audio.duration) && audio.duration > 0){
     progressFill.style.width = (audio.currentTime / audio.duration * 100) + '%';
     curTime.textContent = formatTime(audio.currentTime);
     durTime.textContent = formatTime(audio.duration);
@@ -433,14 +520,14 @@ audio.addEventListener('timeupdate', () => {
 });
 
 progressWrap.addEventListener('click', (e) => {
-  if(isNaN(audio.duration) || currentIndex === -1) return;
+  if(!isFinite(audio.duration) || currentIndex === -1) return;
   const rect = progressWrap.getBoundingClientRect();
   const ratio = (e.clientX - rect.left) / rect.width;
   audio.currentTime = ratio * audio.duration;
 });
 
 function formatTime(sec){
-  if(isNaN(sec)) return '0:00';
+  if(!isFinite(sec)) return '0:00';
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
@@ -472,17 +559,12 @@ async function init(){
     videoStatus.textContent = `Usando: ${customMedia.name}`;
   }
 
-  const storedTracks = await idbGetAllTracks();
-  if(storedTracks.length > 0){
-    tracks = storedTracks
+  // solo metadatos: rápido incluso con bibliotecas grandes
+  const storedMeta = await idbGetAllTrackMeta();
+  if(storedMeta.length > 0){
+    tracks = storedMeta
       .sort((a, b) => a.order - b.order)
-      .map(r => ({
-        title: r.title,
-        artist: r.artist,
-        ext: r.ext,
-        file: r.blob,
-        url: URL.createObjectURL(r.blob)
-      }));
+      .map(r => ({ id: r.id, title: r.title, artist: r.artist, ext: r.ext, url: null, file: null }));
     renderQueue();
 
     const lastIndex = await idbGetSetting('lastIndex');
