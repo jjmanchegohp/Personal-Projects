@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status - YouTube to MP3</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Status <a class="top-link" href="/">&larr; Back</a></h1>
+
+  <button id="refreshBtn" type="button" style="margin-top:0">Refresh now</button>
+  <span class="muted">Auto-refreshes every 30s while this tab is visible.</span>
+
+  <h2>System checks</h2>
+  <table><tbody id="checks"></tbody></table>
+
+  <h2>Last 10 downloads</h2>
+  <p class="muted">Read from the downloads folder, so it survives restarts. Errors are only shown for the current session.</p>
+  <table>
+    <thead><tr><th>Time</th><th>Filename</th><th>Status</th></tr></thead>
+    <tbody id="history"></tbody>
+  </table>
+  <p class="muted" id="empty" hidden>No downloads yet.</p>
+
+<script>
+function addRow(tbody, cells) {
+  const tr = document.createElement('tr');
+  cells.forEach(([text, cls]) => {
+    const td = document.createElement('td');
+    const target = cls && cls.startsWith('badge') ? td.appendChild(document.createElement('span')) : td;
+    target.textContent = text;
+    if (cls) target.className = cls;
+    tr.append(td);
+  });
+  tbody.append(tr);
+}
+
+async function refresh() {
+  const data = await (await fetch('/api/status')).json();
+  const checks = document.getElementById('checks');
+  const history = document.getElementById('history');
+  checks.replaceChildren();
+  history.replaceChildren();
+
+  data.checks.forEach(c =>
+    addRow(checks, [[c.name], [c.detail], [c.ok ? 'OK' : 'MISSING', 'badge ' + (c.ok ? 'ok' : 'bad')]]));
+
+  document.getElementById('empty').hidden = data.history.length > 0;
+  data.history.forEach(h => {
+    const ok = h.status === 'done';
+    addRow(history, [[h.time], [h.filename], [ok ? 'done' : 'error: ' + (h.error || ''), ok ? 'ok' : 'bad']]);
+  });
+}
+
+let timer = null;
+const start = () => { if (!timer) { refresh(); timer = setInterval(refresh, 30000); } };
+const stop = () => { clearInterval(timer); timer = null; };
+
+document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+document.getElementById('refreshBtn').onclick = refresh;
+if (!document.hidden) start();
+</script>
+</body>
+</html>

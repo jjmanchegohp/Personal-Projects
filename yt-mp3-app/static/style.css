@@ -1,0 +1,30 @@
+[hidden] { display: none !important; }
+body { font-family: system-ui, sans-serif; max-width: 700px; margin: 60px auto; padding: 0 20px; background: #111; color: #eee; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.05rem; margin-top: 30px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+a, .ok { color: #7fdb7f; }
+.bad { color: #e63946; }
+.muted, .note { color: #999; font-size: 0.85rem; }
+.note { margin-top: 30px; }
+.top-link { font-size: 0.9rem; float: right; }
+
+label { font-size: 0.85rem; color: #aaa; display: block; margin-top: 14px; }
+input[type=text] { width: 100%; padding: 10px; font-size: 1rem; box-sizing: border-box; border-radius: 6px; border: 1px solid #444; background: #1c1c1c; color: #eee; margin-top: 4px; }
+button { margin: 14px 8px 0 0; padding: 10px 18px; font-size: 1rem; border-radius: 6px; border: none; cursor: pointer; background: #457b9d; color: white; }
+button.primary { background: #e63946; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.link-btn { margin: 0; padding: 0; background: none; color: #7fdb7f; font-size: 0.8rem; text-decoration: underline; }
+
+#status { margin-top: 20px; padding: 12px; border-radius: 6px; background: #1c1c1c; white-space: pre-wrap; }
+#playlistTitle { font-size: 0.9rem; color: #aaa; margin-top: 10px; }
+.group-header { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-bottom: 4px; border-bottom: 1px solid #333; font-size: 0.85rem; color: #ccc; }
+.track-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.track-row input[type=text] { margin-top: 0; flex: 1; }
+.track-status { font-size: 0.8rem; color: #aaa; min-width: 90px; text-align: right; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #222; }
+th { color: #aaa; }
+.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
+.badge.ok { background: #16331d; }
+.badge.bad { background: #3a1418; }

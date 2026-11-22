@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube to MP3</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>YouTube &rarr; MP3 <a class="top-link" href="/status">Status &amp; history &rarr;</a></h1>
+
+  <label for="url">YouTube video or public playlist URL</label>
+  <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=... or .../playlist?list=...">
+  <button type="button" id="lookupBtn">Look up</button>
+
+  <div id="nameSection" hidden>
+    <label for="filename">File name (edit before downloading)</label>
+    <input type="text" id="filename">
+    <button type="button" id="downloadBtn" class="primary">Download MP3</button>
+  </div>
+
+  <div id="playlistSection" hidden>
+    <div id="playlistTitle"></div>
+    <div id="trackList"></div>
+    <button type="button" id="downloadAllBtn" class="primary">Download selected</button>
+  </div>
+
+  <div id="status" hidden></div>
+  <p class="note">Only use this for content you have the right to download (your own uploads, Creative Commons, public domain, or content you have explicit permission for).</p>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
